@@ -1,15 +1,45 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
+$one = <<SCRIPT
+apt install -y cmake libpcre2-dev libssl-dev libssh-dev libcurl4-openssl-dev libpcre2-dev libssl-dev libssh-dev libcurl4-openssl-dev 
+mkdir 1
+cd 1
+git clone https://github.com/CESNET/libyang.git
+cd libyang/
+mkdir build && cd build && cmake .. && make -j$(nproc) && make install
+cd ~/1
+git clone https://github.com/CESNET/libnetconf2.git
+cd libnetconf2
+mkdir build && cd build && cmake .. && make -j$(nproc) && make install
+cd ~/1
+git clone https://github.com/sysrepo/sysrepo.git
+cd sysrepo/
+mkdir build && cd build && cmake .. && make -j$(nproc) && make install
+apt-get install -y pkg-config
+echo "/usr/local/lib" | tee /etc/ld.so.conf.d/local-libs.conf
+ldconfig
+sysrepoctl -l
+apt-get install -y libpam0g-dev
+cd ~/1
+git clone https://github.com/CESNET/netopeer2.git
+cd netopeer2/
+mkdir build && cd build
+cmake -DENABLE_PAM=ON \
+      -DLN2_YANG_MODULE_DIR=/usr/local/share/yang/modules/libnetconf2 \
+      ..
+make -j$(nproc)
+make install
+ldconfig
+
+SCRIPT
+
 $init = <<SCRIPT
-sh -c "echo 'deb http://download.opensuse.org/repositories/home:/liberouter/xUbuntu_16.04/ /' > /etc/apt/sources.list.d/home:liberouter.list"
-wget -nv https://download.opensuse.org/repositories/home:liberouter/xUbuntu_16.04/Release.key -O Release.key
-sudo apt-key add - < Release.key
-apt-get update -y
-apt-get upgrade -y
-apt-get install -y python3-pip python3-flask 
-apt-get install -y virtualenv
-apt-get install -y apache2 libapache2-mod-wsgi-py3
+apt update -y
+apt upgrade -y
+apt install -y python3-pip python3-flask 
+apt install -y virtualenv
+apt install -y apache2 libapache2-mod-wsgi-py3
 SCRIPT
 
 $libyang = <<SCRIPT
@@ -54,14 +84,15 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "Netopeer2GUI" do |gui|
     gui.vm.synced_folder ".", "/home/vagrant/shared", create: true
-    gui.vm.box = "ubuntu/xenial64"
+    gui.vm.box = "ubuntu/jammy64"
     gui.vm.network "forwarded_port", host: "8080", guest: "80", auto_correct: true
     gui.vm.network "forwarded_port", host: "8443", guest: "443", auto_correct: true
     gui.ssh.shell = "sh"
 
-    gui.vm.provision :shell, inline: $init
-    gui.vm.provision :shell, inline: $libyang
-    gui.vm.provision :shell, inline: $libnetconf2
-    gui.vm.provision :shell, inline: $setup
+    gui.vm.provision :shell, inline: $one
+#    gui.vm.provision :shell, inline: $init
+#    gui.vm.provision :shell, inline: $libyang
+#    gui.vm.provision :shell, inline: $libnetconf2
+#    gui.vm.provision :shell, inline: $setup
   end
 end
